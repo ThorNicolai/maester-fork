@@ -79,8 +79,8 @@ function Test-MtInactiveAuthenticationMethods {
         # Collections to store results
         $inactiveMethodsFound = [System.Collections.Generic.List[PSCustomObject]]::new()
         $usersWithInactiveMethodsSet = [System.Collections.Generic.HashSet[string]]::new()
+        $skippedUsers = [System.Collections.Generic.List[PSCustomObject]]::new()
         $usersChecked = 0
-        $usersSkipped = 0
 
         foreach ($user in $allUsers) {
             $usersChecked++
@@ -134,14 +134,19 @@ function Test-MtInactiveAuthenticationMethods {
                 }
 
             } catch {
-                $usersSkipped++
+                $skippedUsers.Add([PSCustomObject]@{
+                    UserId            = $user.id
+                    UserPrincipalName = $user.userPrincipalName
+                    DisplayName       = $user.displayName
+                    Reason            = $_.Exception.Message
+                })
                 Write-Verbose "Could not retrieve authentication methods for user $($user.userPrincipalName): $($_.Exception.Message)"
             }
         }
 
         $usersWithInactiveMethods = $usersWithInactiveMethodsSet.Count
 
-        Write-Verbose "Summary - Users checked: $usersChecked, Users skipped: $usersSkipped, Users with inactive phone methods: $usersWithInactiveMethods, Total inactive phone methods: $($inactiveMethodsFound.Count)"
+        Write-Verbose "Summary - Users checked: $usersChecked, Users skipped: $($skippedUsers.Count), Users with inactive phone methods: $usersWithInactiveMethods, Total inactive phone methods: $($inactiveMethodsFound.Count)"
 
         # Determine test result
         $testPassed = ($inactiveMethodsFound.Count -eq 0)
@@ -150,8 +155,14 @@ function Test-MtInactiveAuthenticationMethods {
         if ($testPassed) {
             $testResultMarkdown = "**Well done!** No inactive Phone (SMS or Voice) authentication methods were found.`n`n"
             $testResultMarkdown += "**Summary:** Checked $usersChecked user(s). All registered Phone (SMS or Voice) authentication methods have been used within the last $InactiveDays days."
-            if ($usersSkipped -gt 0) {
-                $testResultMarkdown += "`n`n**Note:** $usersSkipped user(s) could not be checked (possibly due to permissions or disabled accounts)."
+            if ($skippedUsers.Count -gt 0) {
+                $testResultMarkdown += "`n`n**Note:** $($skippedUsers.Count) user(s) could not be checked (possibly due to permissions or disabled accounts):`n`n"
+                $testResultMarkdown += "| User | Reason |`n"
+                $testResultMarkdown += "| --- | --- |`n"
+                foreach ($skippedUser in $skippedUsers) {
+                    $userLink = "[$($skippedUser.UserPrincipalName)]($($__MtSession.AdminPortalUrl.Entra)#view/Microsoft_AAD_UsersAndTenants/UserProfileMenuBlade/~/overview/userId/$($skippedUser.UserId))"
+                    $testResultMarkdown += "| $userLink | $($skippedUser.Reason) |`n"
+                }
             }
         } else {
             $testResultMarkdown = "**Action Required:** Found $($inactiveMethodsFound.Count) inactive Phone (SMS or Voice) authentication method(s) across $usersWithInactiveMethods user(s).`n`n"
@@ -166,8 +177,14 @@ function Test-MtInactiveAuthenticationMethods {
                 $testResultMarkdown += "| $userLink | $($inactiveMethod.PhoneType) | $($inactiveMethod.InactiveReason) |`n"
             }
 
-            if ($usersSkipped -gt 0) {
-                $testResultMarkdown += "`n**Note:** $usersSkipped user(s) could not be checked (possibly due to permissions or disabled accounts)."
+            if ($skippedUsers.Count -gt 0) {
+                $testResultMarkdown += "`n**Note:** $($skippedUsers.Count) user(s) could not be checked (possibly due to permissions or disabled accounts):`n`n"
+                $testResultMarkdown += "| User | Reason |`n"
+                $testResultMarkdown += "| --- | --- |`n"
+                foreach ($skippedUser in $skippedUsers) {
+                    $userLink = "[$($skippedUser.UserPrincipalName)]($($__MtSession.AdminPortalUrl.Entra)#view/Microsoft_AAD_UsersAndTenants/UserProfileMenuBlade/~/overview/userId/$($skippedUser.UserId))"
+                    $testResultMarkdown += "| $userLink | $($skippedUser.Reason) |`n"
+                }
             }
         }
 
