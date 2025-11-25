@@ -1266,6 +1266,11 @@
       "Title": "Devices with critical credentials should be protected by Credential Guard."
     },
     {
+      "Id": "MT.1106",
+      "Severity": "Medium",
+      "Title": "Users should not have inactive Phone (SMS or Voice) authentication methods."
+    },
+    {
       "Id": "ORCA.100",
       "Severity": "Medium",
       "Title": "Bulk Complaint Level threshold is between 4 and 6."
