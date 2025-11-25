@@ -34,7 +34,7 @@ The test retrieves authentication methods for each user and evaluates the `lastU
 | #microsoft.graph.temporaryAccessPassAuthenticationMethod | Temporary Access Pass |
 | #microsoft.graph.windowsHelloForBusinessAuthenticationMethod | Windows Hello for Business |
 
-**Note:** Password authentication methods are excluded from this check as they are always present and don't have meaningful lastUsedDateTime values.
+**Note:** Password authentication methods are excluded from this check as they are always present and don't have meaningful `lastUsedDateTime` values.
 
 ## How to fix
 

@@ -85,8 +85,8 @@ function Test-MtInactiveAuthenticationMethods {
 
         # Collections to store results
         $inactiveMethodsFound = [System.Collections.Generic.List[PSCustomObject]]::new()
+        $usersWithInactiveMethodsSet = [System.Collections.Generic.HashSet[string]]::new()
         $usersChecked = 0
-        $usersWithInactiveMethods = 0
 
         foreach ($user in $allUsers) {
             $usersChecked++
@@ -110,9 +110,17 @@ function Test-MtInactiveAuthenticationMethods {
                     if ($null -eq $lastUsed -or [string]::IsNullOrEmpty($lastUsed)) {
                         $isInactive = $true
                         $inactiveReason = 'Never used'
-                    } elseif ([DateTime]$lastUsed -lt $thresholdDate) {
-                        $isInactive = $true
-                        $inactiveReason = "Last used: $([DateTime]$lastUsed.ToString('yyyy-MM-dd'))"
+                    } else {
+                        # Safely parse the date
+                        $parsedDate = $null
+                        if ([DateTime]::TryParse($lastUsed, [ref]$parsedDate)) {
+                            if ($parsedDate -lt $thresholdDate) {
+                                $isInactive = $true
+                                $inactiveReason = "Last used: $($parsedDate.ToString('yyyy-MM-dd'))"
+                            }
+                        } else {
+                            Write-Verbose "Could not parse lastUsedDateTime '$lastUsed' for method $methodType"
+                        }
                     }
 
                     if ($isInactive) {
@@ -130,17 +138,18 @@ function Test-MtInactiveAuthenticationMethods {
                             MethodId        = $method.id
                             InactiveReason  = $inactiveReason
                         })
-                    }
-                }
 
-                if ($inactiveMethodsFound | Where-Object { $_.UserId -eq $user.id }) {
-                    $usersWithInactiveMethods++
+                        # Track this user as having inactive methods
+                        [void]$usersWithInactiveMethodsSet.Add($user.id)
+                    }
                 }
 
             } catch {
                 Write-Verbose "Could not retrieve authentication methods for user $($user.userPrincipalName): $($_.Exception.Message)"
             }
         }
+
+        $usersWithInactiveMethods = $usersWithInactiveMethodsSet.Count
 
         Write-Verbose "Summary - Users checked: $usersChecked, Users with inactive methods: $usersWithInactiveMethods, Total inactive methods: $($inactiveMethodsFound.Count)"
 
