@@ -87,6 +87,7 @@ function Test-MtInactiveAuthenticationMethods {
         $inactiveMethodsFound = [System.Collections.Generic.List[PSCustomObject]]::new()
         $usersWithInactiveMethodsSet = [System.Collections.Generic.HashSet[string]]::new()
         $usersChecked = 0
+        $usersSkipped = 0
 
         foreach ($user in $allUsers) {
             $usersChecked++
@@ -145,13 +146,14 @@ function Test-MtInactiveAuthenticationMethods {
                 }
 
             } catch {
+                $usersSkipped++
                 Write-Verbose "Could not retrieve authentication methods for user $($user.userPrincipalName): $($_.Exception.Message)"
             }
         }
 
         $usersWithInactiveMethods = $usersWithInactiveMethodsSet.Count
 
-        Write-Verbose "Summary - Users checked: $usersChecked, Users with inactive methods: $usersWithInactiveMethods, Total inactive methods: $($inactiveMethodsFound.Count)"
+        Write-Verbose "Summary - Users checked: $usersChecked, Users skipped: $usersSkipped, Users with inactive methods: $usersWithInactiveMethods, Total inactive methods: $($inactiveMethodsFound.Count)"
 
         # Determine test result
         $testPassed = ($inactiveMethodsFound.Count -eq 0)
@@ -160,6 +162,9 @@ function Test-MtInactiveAuthenticationMethods {
         if ($testPassed) {
             $testResultMarkdown = "**Well done!** No inactive authentication methods were found.`n`n"
             $testResultMarkdown += "**Summary:** Checked $usersChecked user(s). All registered authentication methods have been used within the last $InactiveDays days."
+            if ($usersSkipped -gt 0) {
+                $testResultMarkdown += "`n`n**Note:** $usersSkipped user(s) could not be checked (possibly due to permissions or disabled accounts)."
+            }
         } else {
             $testResultMarkdown = "**Action Required:** Found $($inactiveMethodsFound.Count) inactive authentication method(s) across $usersWithInactiveMethods user(s).`n`n"
             $testResultMarkdown += "Authentication methods that have not been used in $InactiveDays days or have never been used should be reviewed.`n`n"
@@ -171,6 +176,10 @@ function Test-MtInactiveAuthenticationMethods {
             foreach ($inactiveMethod in $inactiveMethodsFound) {
                 $userLink = "[$($inactiveMethod.UserPrincipalName)]($($__MtSession.AdminPortalUrl.Entra)#view/Microsoft_AAD_UsersAndTenants/UserProfileMenuBlade/~/overview/userId/$($inactiveMethod.UserId))"
                 $testResultMarkdown += "| $userLink | $($inactiveMethod.MethodType) | $($inactiveMethod.InactiveReason) |`n"
+            }
+
+            if ($usersSkipped -gt 0) {
+                $testResultMarkdown += "`n**Note:** $usersSkipped user(s) could not be checked (possibly due to permissions or disabled accounts)."
             }
         }
 
