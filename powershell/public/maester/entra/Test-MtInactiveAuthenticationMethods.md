@@ -1,8 +1,8 @@
-# Never-used Phone (SMS or Voice) authentication methods should be reviewed
+# Inactive Phone (SMS or Voice) authentication methods should be reviewed
 
-This test checks if users have Phone (SMS or Voice) authentication methods registered that have never been used.
+This test checks if users have Phone (SMS or Voice) authentication methods registered that have not been used within the configured threshold (default: 90 days).
 
-Phone authentication methods that are registered but have never been used may indicate:
+Phone authentication methods that are registered but inactive may indicate:
 - Stale credentials that should be removed
 - Methods set up but abandoned during onboarding
 - Potential security concerns if users are not using expected authentication methods
@@ -13,7 +13,7 @@ The test evaluates the `lastUsedDateTime` property for Phone (SMS or Voice) auth
 
 If this test fails, you should:
 
-1. **Review the identified users and their never-used phone methods** - Determine if the methods are still needed
+1. **Review the identified users and their inactive phone methods** - Determine if the methods are still needed
 2. **Contact users** - Verify if they are aware of the registered phone methods and if they should be using them
 3. **Remove unused methods** - If a phone method is no longer needed, remove it from the user's account
 
@@ -21,7 +21,7 @@ To remove a phone authentication method:
 
 1. Go to the [Microsoft Entra admin center](https://entra.microsoft.com)
 2. Navigate to **Users** > **All users**
-3. Select the user with the never-used phone method
+3. Select the user with the inactive phone method
 4. Go to **Authentication methods**
 5. Remove the unused phone authentication method
 
@@ -29,7 +29,6 @@ To remove a phone authentication method:
 
 - [Authentication methods in Microsoft Entra ID](https://learn.microsoft.com/entra/identity/authentication/concept-authentication-methods)
 - [Manage user authentication methods](https://learn.microsoft.com/entra/identity/authentication/howto-mfa-userdevicesettings)
-- [Microsoft Graph API - Authentication methods](https://learn.microsoft.com/graph/api/resources/authenticationmethods-overview)
 
 ## Related links
 
