@@ -1268,7 +1268,7 @@
     {
       "Id": "MT.1106",
       "Severity": "Medium",
-      "Title": "Users should not have inactive authentication methods."
+      "Title": "Users should not have never-used Phone (SMS or Voice) authentication methods."
     },
     {
       "Id": "ORCA.100",

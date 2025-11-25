@@ -1,33 +1,22 @@
 <#
 .SYNOPSIS
-    Tests if users have inactive authentication methods that have not been used recently.
+    Tests if users have never used Phone (SMS or Voice) authentication methods.
 
 .DESCRIPTION
-    This function checks all users for authentication methods that have not been used
-    within a specified number of days. Authentication methods that are registered but
-    never used (null lastUsedDateTime) or have not been used for a long time may indicate
-    stale credentials that should be reviewed or removed.
+    This function checks all users for Phone (SMS or Voice) authentication methods that
+    have never been used (null lastUsedDateTime). Phone authentication methods that are
+    registered but never used may indicate stale credentials that should be reviewed or removed.
 
     The test retrieves authentication methods for each user and evaluates the lastUsedDateTime
-    property to determine if any methods are inactive.
-
-.PARAMETER InactiveDays
-    The number of days after which an authentication method is considered inactive.
-    Default is 90 days. Methods with lastUsedDateTime older than this threshold or
-    with null lastUsedDateTime will be flagged as inactive.
+    property to identify phone methods that have never been used.
 
 .OUTPUTS
-    [bool] - Returns $true if no inactive authentication methods are found, $false if any are found, $null if skipped.
+    [bool] - Returns $true if no never-used phone authentication methods are found, $false if any are found, $null if skipped.
 
 .EXAMPLE
     Test-MtInactiveAuthenticationMethods
 
-    Checks all users for inactive authentication methods using the default 90-day threshold.
-
-.EXAMPLE
-    Test-MtInactiveAuthenticationMethods -InactiveDays 180
-
-    Checks all users for authentication methods not used in the last 180 days.
+    Checks all users for never-used Phone (SMS or Voice) authentication methods.
 
 .LINK
     https://maester.dev/docs/commands/Test-MtInactiveAuthenticationMethods
@@ -37,10 +26,7 @@ function Test-MtInactiveAuthenticationMethods {
     [CmdletBinding()]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification = 'This test checks multiple authentication methods for all users.')]
     [OutputType([bool])]
-    param(
-        [Parameter()]
-        [int]$InactiveDays = 90
-    )
+    param()
 
     # Early exit if Graph connection is not available
     if (-not (Test-MtConnection Graph)) {
@@ -48,22 +34,9 @@ function Test-MtInactiveAuthenticationMethods {
         return $null
     }
 
-    # Define authentication method type mapping for display names
-    $authMethodTypeMap = @{
-        '#microsoft.graph.emailAuthenticationMethod'                        = 'Email'
-        '#microsoft.graph.externalAuthenticationMethod'                     = 'External Authentication Method'
-        '#microsoft.graph.fido2AuthenticationMethod'                        = 'FIDO2'
-        '#microsoft.graph.hardwareOathAuthenticationMethod'                 = 'Hardware OATH'
-        '#microsoft.graph.microsoftAuthenticatorAuthenticationMethod'       = 'Microsoft Authenticator'
-        '#microsoft.graph.passwordlessMicrosoftAuthenticatorAuthenticationMethod' = 'Passwordless Microsoft Authenticator'
-        '#microsoft.graph.passwordAuthenticationMethod'                     = 'Password'
-        '#microsoft.graph.phoneAuthenticationMethod'                        = 'Phone (SMS or Voice)'
-        '#microsoft.graph.platformCredentialAuthenticationMethod'           = 'Platform Credential'
-        '#microsoft.graph.qrCodePinAuthenticationMethod'                    = 'QR Code PIN'
-        '#microsoft.graph.softwareOathAuthenticationMethod'                 = 'Software OATH'
-        '#microsoft.graph.temporaryAccessPassAuthenticationMethod'          = 'Temporary Access Pass'
-        '#microsoft.graph.windowsHelloForBusinessAuthenticationMethod'      = 'Windows Hello for Business'
-    }
+    # Phone authentication method type
+    $phoneMethodType = '#microsoft.graph.phoneAuthenticationMethod'
+    $phoneMethodDisplayName = 'Phone (SMS or Voice)'
 
     try {
         Write-Verbose "Step 1: Retrieving all users..."
@@ -78,14 +51,11 @@ function Test-MtInactiveAuthenticationMethods {
             return $true
         }
 
-        Write-Verbose "Step 2: Checking authentication methods for each user..."
-
-        # Calculate the threshold date
-        $thresholdDate = (Get-Date).AddDays(-$InactiveDays)
+        Write-Verbose "Step 2: Checking Phone (SMS or Voice) authentication methods for each user..."
 
         # Collections to store results
-        $inactiveMethodsFound = [System.Collections.Generic.List[PSCustomObject]]::new()
-        $usersWithInactiveMethodsSet = [System.Collections.Generic.HashSet[string]]::new()
+        $neverUsedMethodsFound = [System.Collections.Generic.List[PSCustomObject]]::new()
+        $usersWithNeverUsedMethodsSet = [System.Collections.Generic.HashSet[string]]::new()
         $usersChecked = 0
         $usersSkipped = 0
 
@@ -99,49 +69,27 @@ function Test-MtInactiveAuthenticationMethods {
                 foreach ($method in $userAuthMethods) {
                     $methodType = $method.'@odata.type'
 
-                    # Skip password authentication method as it's always present and doesn't have meaningful lastUsedDateTime
-                    if ($methodType -eq '#microsoft.graph.passwordAuthenticationMethod') {
+                    # Only check Phone (SMS or Voice) authentication methods
+                    if ($methodType -ne $phoneMethodType) {
                         continue
                     }
 
                     $lastUsed = $method.lastUsedDateTime
-                    $isInactive = $false
-                    $inactiveReason = ''
 
+                    # Only flag methods that have never been used
                     if ($null -eq $lastUsed -or [string]::IsNullOrEmpty($lastUsed)) {
-                        $isInactive = $true
-                        $inactiveReason = 'Never used'
-                    } else {
-                        # Safely parse the date
-                        $parsedDate = $null
-                        if ([DateTime]::TryParse($lastUsed, [ref]$parsedDate)) {
-                            if ($parsedDate -lt $thresholdDate) {
-                                $isInactive = $true
-                                $inactiveReason = "Last used: $($parsedDate.ToString('yyyy-MM-dd'))"
-                            }
-                        } else {
-                            Write-Verbose "Could not parse lastUsedDateTime '$lastUsed' for method $methodType"
-                        }
-                    }
-
-                    if ($isInactive) {
-                        $methodDisplayName = if ($authMethodTypeMap.ContainsKey($methodType)) {
-                            $authMethodTypeMap[$methodType]
-                        } else {
-                            ($methodType -replace '#microsoft.graph.', '') -replace 'AuthenticationMethod', ''
-                        }
-
-                        $inactiveMethodsFound.Add([PSCustomObject]@{
-                            UserId          = $user.id
+                        $neverUsedMethodsFound.Add([PSCustomObject]@{
+                            UserId            = $user.id
                             UserPrincipalName = $user.userPrincipalName
-                            DisplayName     = $user.displayName
-                            MethodType      = $methodDisplayName
-                            MethodId        = $method.id
-                            InactiveReason  = $inactiveReason
+                            DisplayName       = $user.displayName
+                            MethodType        = $phoneMethodDisplayName
+                            MethodId          = $method.id
+                            PhoneNumber       = $method.phoneNumber
+                            PhoneType         = $method.phoneType
                         })
 
-                        # Track this user as having inactive methods
-                        [void]$usersWithInactiveMethodsSet.Add($user.id)
+                        # Track this user as having never-used methods
+                        [void]$usersWithNeverUsedMethodsSet.Add($user.id)
                     }
                 }
 
@@ -151,31 +99,31 @@ function Test-MtInactiveAuthenticationMethods {
             }
         }
 
-        $usersWithInactiveMethods = $usersWithInactiveMethodsSet.Count
+        $usersWithNeverUsedMethods = $usersWithNeverUsedMethodsSet.Count
 
-        Write-Verbose "Summary - Users checked: $usersChecked, Users skipped: $usersSkipped, Users with inactive methods: $usersWithInactiveMethods, Total inactive methods: $($inactiveMethodsFound.Count)"
+        Write-Verbose "Summary - Users checked: $usersChecked, Users skipped: $usersSkipped, Users with never-used phone methods: $usersWithNeverUsedMethods, Total never-used phone methods: $($neverUsedMethodsFound.Count)"
 
         # Determine test result
-        $testPassed = ($inactiveMethodsFound.Count -eq 0)
+        $testPassed = ($neverUsedMethodsFound.Count -eq 0)
 
         # Generate detailed markdown report
         if ($testPassed) {
-            $testResultMarkdown = "**Well done!** No inactive authentication methods were found.`n`n"
-            $testResultMarkdown += "**Summary:** Checked $usersChecked user(s). All registered authentication methods have been used within the last $InactiveDays days."
+            $testResultMarkdown = "**Well done!** No never-used Phone (SMS or Voice) authentication methods were found.`n`n"
+            $testResultMarkdown += "**Summary:** Checked $usersChecked user(s). All registered Phone (SMS or Voice) authentication methods have been used."
             if ($usersSkipped -gt 0) {
                 $testResultMarkdown += "`n`n**Note:** $usersSkipped user(s) could not be checked (possibly due to permissions or disabled accounts)."
             }
         } else {
-            $testResultMarkdown = "**Action Required:** Found $($inactiveMethodsFound.Count) inactive authentication method(s) across $usersWithInactiveMethods user(s).`n`n"
-            $testResultMarkdown += "Authentication methods that have not been used in $InactiveDays days or have never been used should be reviewed.`n`n"
+            $testResultMarkdown = "**Action Required:** Found $($neverUsedMethodsFound.Count) never-used Phone (SMS or Voice) authentication method(s) across $usersWithNeverUsedMethods user(s).`n`n"
+            $testResultMarkdown += "Phone (SMS or Voice) authentication methods that have never been used should be reviewed and removed.`n`n"
 
-            # Create table of inactive methods
-            $testResultMarkdown += "| User | Method Type | Status |`n"
+            # Create table of never-used methods
+            $testResultMarkdown += "| User | Phone Number | Phone Type |`n"
             $testResultMarkdown += "| --- | --- | --- |`n"
 
-            foreach ($inactiveMethod in $inactiveMethodsFound) {
-                $userLink = "[$($inactiveMethod.UserPrincipalName)]($($__MtSession.AdminPortalUrl.Entra)#view/Microsoft_AAD_UsersAndTenants/UserProfileMenuBlade/~/overview/userId/$($inactiveMethod.UserId))"
-                $testResultMarkdown += "| $userLink | $($inactiveMethod.MethodType) | $($inactiveMethod.InactiveReason) |`n"
+            foreach ($neverUsedMethod in $neverUsedMethodsFound) {
+                $userLink = "[$($neverUsedMethod.UserPrincipalName)]($($__MtSession.AdminPortalUrl.Entra)#view/Microsoft_AAD_UsersAndTenants/UserProfileMenuBlade/~/overview/userId/$($neverUsedMethod.UserId))"
+                $testResultMarkdown += "| $userLink | $($neverUsedMethod.PhoneNumber) | $($neverUsedMethod.PhoneType) |`n"
             }
 
             if ($usersSkipped -gt 0) {
@@ -187,7 +135,7 @@ function Test-MtInactiveAuthenticationMethods {
 
     } catch {
         Write-Error $_.Exception.Message
-        Add-MtTestResultDetail -Result "**Error** checking inactive authentication methods: $($_.Exception.Message)"
+        Add-MtTestResultDetail -Result "**Error** checking never-used Phone (SMS or Voice) authentication methods: $($_.Exception.Message)"
         return $false
     }
 

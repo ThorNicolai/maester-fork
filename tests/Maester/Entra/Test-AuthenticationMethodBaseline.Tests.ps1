@@ -4,8 +4,8 @@ Describe "Maester/Entra" -Tag "Maester", "Authentication", "Security" {
         Test-MtAuthenticationPolicyReferencedObjectsExist | Should -Be $true -Because "authentication method policies should not reference deleted or non-existent groups"
     }
 
-    It "MT.1106: Users should not have inactive authentication methods. See https://maester.dev/docs/tests/MT.1106" -Tag "MT.1106" {
+    It "MT.1106: Users should not have never-used Phone (SMS or Voice) authentication methods. See https://maester.dev/docs/tests/MT.1106" -Tag "MT.1106" {
 
-        Test-MtInactiveAuthenticationMethods | Should -Be $true -Because "inactive authentication methods may indicate stale credentials that should be reviewed or removed"
+        Test-MtInactiveAuthenticationMethods | Should -Be $true -Because "never-used Phone (SMS or Voice) authentication methods may indicate stale credentials that should be reviewed or removed"
     }
 }
